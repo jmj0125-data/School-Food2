@@ -263,6 +263,7 @@ def is_side_dish(item):
     return True
 
 
+
 # ==========================================
 # 화면: 학교 검색
 # ==========================================
@@ -274,36 +275,59 @@ school_name = st.text_input(
     placeholder="예: 수도여고, 서울고등학교"
 )
 
+# 세션 상태 초기화
 if "schools" not in st.session_state:
     st.session_state.schools = []
 
 if "search_done" not in st.session_state:
     st.session_state.search_done = False
 
+if "selected_school_labels" not in st.session_state:
+    st.session_state.selected_school_labels = []
 
+
+# 학교 검색 버튼
 if st.button("학교 검색", type="primary"):
+
     if not school_name.strip():
         st.warning("학교 이름을 입력해 주세요.")
 
     else:
         with st.spinner("학교 정보를 검색하고 있습니다..."):
+
             schools, api_error = search_schools(school_name)
 
         st.session_state.schools = schools
         st.session_state.search_done = True
         st.session_state.api_error = api_error
 
+        # 새로운 검색 시 이전 선택 초기화
+        st.session_state.selected_school_labels = []
+
+        # 이전 급식 결과 초기화
+        if "meal_results" in st.session_state:
+            del st.session_state.meal_results
+
+        if "meal_date" in st.session_state:
+            del st.session_state.meal_date
+
+
+# 검색 결과 출력
+selected_schools = []
 
 if st.session_state.search_done:
 
     schools = st.session_state.schools
 
     if schools:
+
         st.success(f"총 {len(schools)}개의 학교를 찾았습니다.")
 
+        # 학교 이름과 지역을 조합하여 구분
         school_options = {}
 
         for school in schools:
+
             school_label = (
                 f"{school['SCHUL_NM']} "
                 f"({school['LCTN_SC_NM']})"
@@ -311,25 +335,50 @@ if st.session_state.search_done:
 
             school_options[school_label] = school
 
+        # 현재 검색 결과에 존재하는 학교만 선택 상태 유지
+        valid_labels = list(school_options.keys())
+
+        st.session_state.selected_school_labels = [
+            label
+            for label in st.session_state.selected_school_labels
+            if label in valid_labels
+        ]
+
+        # 다중 선택 위젯
         selected_labels = st.multiselect(
             "비교할 학교를 선택하세요. (여러 학교 선택 가능)",
-            options=list(school_options.keys()),
+            options=valid_labels,
+            key="selected_school_labels",
             placeholder="학교를 선택하세요."
         )
 
+        # 선택한 학교 목록 생성
         selected_schools = [
             school_options[label]
             for label in selected_labels
         ]
 
+        # 선택 현황 표시
+        if selected_schools:
+
+            st.caption(
+                f"현재 {len(selected_schools)}개 학교 선택됨"
+            )
+
+            for school in selected_schools:
+                st.write(
+                    f"✓ {school['SCHUL_NM']} "
+                    f"({school['LCTN_SC_NM']})"
+                )
+
     else:
-        selected_schools = []
 
         if st.session_state.get("api_error"):
             st.error(
                 "학교 정보를 불러오지 못했습니다. "
                 "잠시 후 다시 시도해 주세요."
             )
+
         else:
             st.info(
                 "해당 학교를 찾을 수 없습니다. "
@@ -337,24 +386,7 @@ if st.session_state.search_done:
             )
 
 else:
-    selected_schools = []
-
-
-# ==========================================
-# 화면: 날짜 선택
-# ==========================================
-
-st.divider()
-
-st.header("2. 급식 날짜 선택")
-
-today = datetime.now(KST).date()
-
-selected_date = st.date_input(
-    "조회할 날짜",
-    value=today,
-    format="YYYY-MM-DD"
-)
+    st.info("학교 이름을 검색해 주세요.")
 
 
 # ==========================================
